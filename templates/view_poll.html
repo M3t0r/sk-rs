@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block markup %}
+<main class="container">
+    <h1>{{ title }}</h1>
+    <p>{{ description }}</p>
+    {% if is_expired %}
+    <p>
+        Expiration Date: <del>{{ expiration }}</del>
+        <small><i class="fas fa-exclamation-circle"></i> This poll has expired and is no longer active.</small>
+    </p>
+    {% else %}
+    <p>Expiration Date: {{ expiration|date }}</p>
+    {% endif %}
+    {% if is_admin %}
+    <nav>
+        <ul>
+            <li><a href="{{edit_url}}" class="primary" role="button"><i class="fa-solid fa-pencil"></i>&nbsp;edit</a>
+            <li><a hx-target="closest li" hx-get="{{admin_share_url}}" class="secondary" role="button"><i class="fa-solid fa-lock"></i>&nbsp;share admin access</a>
+        </ul>
+    </nav>
+    {% endif %}
+    
+    <div class="overflow-auto">
+    {% include "frag-board.html" %}
+    </div>
+
+    {% if new_voter_url is defined %}
+    {% include "frag-new-voter-form.html" %}
+    {% endif %}
+    
+    <a href="/" role="button"><i class="fa-solid fa-chevron-left"></i>&nbsp;Back to Home</a>
+</main>
+{% endblock %}

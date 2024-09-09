@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            token as \"token!: Token\",\n            admin_token as \"admin_token!: Token\",\n            expiration as \"expiration: time::OffsetDateTime\"\n        FROM polls\n        WHERE\n            token = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "token!: Token",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "admin_token!: Token",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "expiration: time::OffsetDateTime",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "86135b9c14d0eddd04f756797aef0c4efc8e2d2e7b6cd76d10331c8cd66b4c97"
+}

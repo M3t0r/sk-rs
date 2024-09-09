@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block markup %}
+<main class="container">
+    <h1>Create New Poll</h1>
+    <form method="post" action="#">
+        <fieldset>
+            <label for="title">Poll Title</label>
+            <input type="text" id="title" name="title" placeholder="Enter poll title" required aria-label="Poll Title">
+            
+            <label for="description">Description</label>
+            <textarea id="description" name="description" placeholder="Enter poll description" required aria-label="Poll Description"></textarea>
+            
+            <small>The poll will automatically expire after 90 days.</small>
+        </fieldset>
+        <fieldset>
+            <label>Options</label>
+            <div>
+                {% for option in options %}
+                {% include "new_poll_new_option.html" %}
+                {% endfor %}
+                <a
+                    hx-get="/poll/new/new-option"
+                    hx-target="this"
+                    hx-swap="beforebegin"
+                    role="button"
+                    class="outline"
+                >
+                    <i class="fa-solid fa-plus"></i>&nbsp;add option
+                </a>
+            </div>
+        </fieldset>
+        <button type="submit" aria-label="Create Poll">Create Poll</button>
+    </form>
+</main>
+{% endblock %}

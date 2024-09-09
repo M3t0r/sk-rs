@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            title,\n            admin_token as \"admin_token: Token\",\n            description,\n            expiration as \"expiration: time::OffsetDateTime\",\n            (\n                SELECT\n                    json_object(\n                        'by_voters', (\n                            SELECT\n                                json_group_object(\n                                    voter,\n                                    json(obj)\n                                )\n                            FROM (\n                                SELECT\n                                    voters.name as voter,\n                                    json_object(\n                                        'id', voters.id,\n                                        'edit_token', voters.edit_token,\n                                        'votes', json_group_array(\n                                            COALESCE(votes.vote, 0)\n                                        )\n                                    ) as obj\n                                FROM voters\n                                    INNER JOIN options\n                                        ON voters.poll_token = options.poll_token\n                                    LEFT JOIN votes\n                                        ON votes.voter_id = voters.id\n                                        AND votes.option = options.name\n                                WHERE\n                                    voters.poll_token == polls.token\n                                GROUP BY\n                                    voters.name\n                                ORDER BY\n                                    options.rowid\n                            )\n                        ),\n                        'options', (\n                            SELECT json_group_array(name)\n                            FROM options\n                            WHERE poll_token = polls.token\n                            ORDER BY rowid\n                        )\n                    )\n            ) as \"board!: Json<Board>\"\n        FROM polls\n        WHERE token = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "title",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "admin_token: Token",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "expiration: time::OffsetDateTime",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "board!: Json<Board>",
+        "ordinal": 4,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "d5a4c21eefa898e70685e3fb648bddf0412121d26055ced6b445bbc4bf59432b"
+}

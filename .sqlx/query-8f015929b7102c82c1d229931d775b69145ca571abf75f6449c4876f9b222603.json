@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO\n                voters(name, poll_token, edit_token)\n            VALUES\n                (?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "8f015929b7102c82c1d229931d775b69145ca571abf75f6449c4876f9b222603"
+}

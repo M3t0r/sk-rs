@@ -1,0 +1,17 @@
+<form hx-post="{{ new_voter_url }}" hx-swap="outerHTML">
+    <fieldset role="group">
+        <input
+            name="name"
+            type="text"
+            placeholder="Name"
+            {% if voter_name is defined %}value="{{voter_name}}"{% endif %}
+            aria-describedby="new-voter-helper"
+            {% if error is defined %}aria-invalid="true"{% endif %}
+            {% if error and not fixable|default(default=true) %}disabled{% endif %}
+        >
+        <input value="Start Voting" type="submit">
+    </fieldset>
+    {% if error %}
+    <small id="new-voter-helper">{{ error }}</small>
+    {% endif %}
+</form>

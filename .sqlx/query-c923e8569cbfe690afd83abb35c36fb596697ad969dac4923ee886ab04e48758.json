@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                unixepoch(polls.expiration, 'utc') < unixepoch('now', 'utc') as \"is_expired!: bool\",\n                polls.admin_token as \"admin_token!: Token\",\n                json_group_object(voters.name, voters.edit_token)\n                    FILTER (WHERE voters.name IS NOT NULL)\n                    as \"voters!: Json<BTreeMap<String, Token>>\"\n            FROM\n                polls\n                LEFT JOIN voters ON voters.poll_token = polls.token\n            WHERE\n                polls.token = ?\n            GROUP BY\n                polls.rowid\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "is_expired!: bool",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "admin_token!: Token",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "voters!: Json<BTreeMap<String, Token>>",
+        "ordinal": 2,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "c923e8569cbfe690afd83abb35c36fb596697ad969dac4923ee886ab04e48758"
+}

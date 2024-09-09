@@ -1,0 +1,11 @@
+<fieldset role="group">
+    <input type="text" name="options" value="{{option}}">
+    <button
+        hx-get="/poll/new/del-option"
+        hx-target="closest fieldset"
+        hx-swap="outerHTML"
+        class="outline"
+    >
+        <i class="fa-solid fa-trash"></i>
+    </button>
+</fieldset>

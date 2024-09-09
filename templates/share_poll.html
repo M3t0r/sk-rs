@@ -1,0 +1,5 @@
+{% if is_admin %}
+<a href="{{admin_url}}" hx-boost="false"><i class="fa-solid fa-unlock"></i>&nbsp;admin link</a>
+{% else %}
+<del data-tooltip="you don't have admin access"><i class="fa-solid fa-lock"></i>&nbsp;share admin access</del>
+{% endif %}

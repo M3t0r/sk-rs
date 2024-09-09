@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO votes (voter_id, option, poll_token, vote)\n                VALUES (\n                    (SELECT id FROM voters WHERE poll_token = ? AND name = ?),\n                    ?,\n                    ?,\n                    ?\n                )\n                ON CONFLICT (voter_id, option) DO UPDATE SET vote = excluded.vote\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "d34789e2cf86012a2123d3883ac13bac4d648bfa01eca7406c080ad18b8f3c2b"
+}

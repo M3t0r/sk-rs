@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/pico.min.css">
+    <link rel="stylesheet" href="/static/fontawesome.min.css">
+    <script src="/static/htmx.min.js"></script>
+    <script>
+        htmx.on('htmx:beforeSwap', function(evt) {
+            if(evt.detail.xhr.status < 500){
+                evt.detail.shouldSwap = true;
+            } else {
+                console.log(evt);
+                evt.detail.shouldSwap = true;
+                evt.detail.target = htmx.find("#error-dialog-message");
+                evt.detail.isError = true;
+                evt.detail.swapOverride = 'innerHTML'; // comes in htmx > 2.0.2
+
+                htmx.find("#error-dialog").showModal();
+            }
+        });
+    </script>
+    <style>
+        .board select {
+            width: 5.5rem;
+            text-align: right;
+        }
+        .board .score {
+            /* total column */
+            text-align: right;
+        }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+<body hx-boost="true">
+    {% block markup %}{% endblock %}
+    <dialog id="error-dialog">
+        <blockquote id="error-dialog-message"></blockquote>
+        <button formmethod="dialog">Close</button>
+    </dialog>
+</body>
+</html>
