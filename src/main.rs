@@ -531,10 +531,12 @@ async fn new_voter(
         r#"
             SELECT
                 polls.expiration AS "expiration!: time::OffsetDateTime",
-                json_group_array(voters.name) AS "voters!: Json<Vec<String>>"
+                json_group_array(voters.name)
+                    FILTER (WHERE voters.name IS NOT NULL)
+                    AS "voters!: Json<Vec<String>>"
             FROM
                 polls
-                INNER JOIN voters ON voters.poll_token = polls.token
+                LEFT JOIN voters ON voters.poll_token = polls.token
             WHERE
                 token = ?
         "#,

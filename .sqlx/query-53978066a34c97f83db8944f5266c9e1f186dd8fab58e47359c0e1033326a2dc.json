@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                polls.expiration AS \"expiration!: time::OffsetDateTime\",\n                json_group_array(voters.name)\n                    FILTER (WHERE voters.name IS NOT NULL)\n                    AS \"voters!: Json<Vec<String>>\"\n            FROM\n                polls\n                LEFT JOIN voters ON voters.poll_token = polls.token\n            WHERE\n                token = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "expiration!: time::OffsetDateTime",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "voters!: Json<Vec<String>>",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "53978066a34c97f83db8944f5266c9e1f186dd8fab58e47359c0e1033326a2dc"
+}
