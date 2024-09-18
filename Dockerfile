@@ -17,9 +17,8 @@ RUN cargo build --release
 # Runtime stage
 FROM alpine:3.20
 
-RUN addgroup -S app && adduser -S app -G app
-
-RUN apk add --no-cache libgcc sqlite-libs
+RUN apk add --no-cache libgcc sqlite
+RUN adduser -u 100 -S app -G users
 
 WORKDIR /app
 
@@ -27,8 +26,7 @@ COPY --from=builder /app/target/release/sk-rs /usr/bin
 COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/static ./static
 
-USER app
-
+USER 100:100
 EXPOSE 3000
 
 ENV RUST_BACKTRACE=full
@@ -37,4 +35,4 @@ LABEL org.opencontainers.image.authors="M3t0r <github@m3t0r.de>"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.source="https://github.com/M3t0r/sk-rs"
 
-CMD ["sk-rs"]
+ENTRYPOINT ["sk-rs"]
