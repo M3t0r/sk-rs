@@ -5,24 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
     <link rel="stylesheet" href="/static/pico.min.css">
-    <link rel="stylesheet" href="/static/fontawesome.min.css">
-    <script src="/static/htmx.min.js"></script>
+    <script src="/static/htmx.min.js" defer></script>
 
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <script>
-        htmx.on('htmx:beforeSwap', function(evt) {
-            if(evt.detail.xhr.status < 500){
-                evt.detail.shouldSwap = true;
-            } else {
-                console.log(evt);
-                evt.detail.shouldSwap = true;
-                evt.detail.target = htmx.find("#error-dialog-message");
-                evt.detail.isError = true;
-                evt.detail.swapOverride = 'innerHTML'; // comes in htmx > 2.0.2
 
-                htmx.find("#error-dialog").showModal();
-            }
+    <link rel="preload" as="font" href="/static/fa-solid-900.woff2" crossorigin>
+    <link rel="preload" as="font" href="/static/fa-regular-400.woff2" crossorigin>
+    <link rel="stylesheet" href="/static/fontawesome.min.css">
+    <link rel="stylesheet" href="/static/solid.min.css">
+    <link rel="stylesheet" href="/static/regular.min.css">
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            htmx.on('htmx:beforeSwap', function(evt) {
+                if(evt.detail.xhr.status < 500){
+                    evt.detail.shouldSwap = true;
+                } else {
+                    console.log(evt);
+                    evt.detail.shouldSwap = true;
+                    evt.detail.target = htmx.find("#error-dialog-message");
+                    evt.detail.isError = true;
+                    evt.detail.swapOverride = 'innerHTML'; // comes in htmx > 2.0.2
+
+                    htmx.find("#error-dialog").showModal();
+                }
+            });
         });
     </script>
     <style>
