@@ -1,14 +1,14 @@
 use axum::{
-    extract::{Path, State}, http::header, response::{IntoResponse, Redirect}, routing::{get, post}, Router
+    extract::{Path, State}, http::{header, StatusCode}, response::{IntoResponse, Redirect, Response}, routing::{get, post}, Router
 };
 use axum_extra::{extract::{cookie::Cookie, CookieJar, Form}, response::Html};
 use axum_htmx::{AutoVaryLayer, HxRefresh};
+use minijinja::{context, Environment, Value};
 use serde::{Deserialize, Serialize};
 use clap::Parser;
 use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf, str::FromStr};
 use tokio;
-use tera::{Context, Tera};
 use sqlx::{migrate::MigrateError, sqlite::{SqliteConnectOptions, SqlitePool}, QueryBuilder, types::Json};
 use tower_http::services::ServeDir;
 
@@ -31,8 +31,33 @@ struct Args {
 
 #[derive(Clone)]
 struct AppState {
-    tera: Tera,
+    tpl: Environment<'static>,
     db: SqlitePool,
+}
+
+impl AppState {
+    fn log_minijinja_error(&self, prefix: &str, err: minijinja::Error) {
+        eprintln!("{}: {:#}", prefix, err);
+        let mut err = &err as &dyn std::error::Error;
+        while let Some(next_err) = err.source() {
+            eprintln!("    caused by: {:#}", next_err);
+            err = next_err;
+        }
+    }
+    pub fn render(&self, template: &str, context: Value) -> Result<String, Response> {
+        let tpl = self.tpl
+            .get_template(template)
+            .map_err(|e| {
+                self.log_minijinja_error(&format!("Failed to load template: '{}'", template), e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to prepare a response").into_response()
+            })?;
+        tpl
+            .render(context)
+            .map_err(|e| {
+                self.log_minijinja_error(&format!("Failed to render template: '{}'", template), e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to prepare a response").into_response()
+            })
+    }
 }
 
 async fn migrate(pool: &SqlitePool) -> Result<(), MigrateError> {
@@ -56,13 +81,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     migrate(&pool).await?;
 
     // Initialize Tera
-    let tera = match Tera::new("templates/**/*") {
-        Ok(t) => t,
-        Err(e) => {
-            println!("Parsing error(s): {}", e);
-            ::std::process::exit(1);
-        }
-    };
+    let mut tpl = Environment::new();
+    minijinja_contrib::add_to_environment(&mut tpl);
+    minijinja_embed::load_templates!(&mut tpl);
 
     let compression = tower_http::compression::CompressionLayer::new()
         .gzip(true)
@@ -84,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest_service("/static", ServeDir::new(PathBuf::from("static")))
         .layer(compression)
         .layer(AutoVaryLayer)
-        .with_state(AppState{tera, db: pool});
+        .with_state(AppState{tpl, db: pool});
 
     println!("Listening on {}", args.bind);
 
@@ -96,12 +117,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn index(State(state): State<AppState>) -> impl IntoResponse {
-    let mut context = tera::Context::new();
-    context.insert("title", "Simple Axum Server");
-    context.insert("heading", "Welcome to the Simple Axum Server");
-    context.insert("message", "This page is rendered using Tera templates with Pico.css and HTMX.");
-
-    let html = state.tera.render("index.html", &context).unwrap();
+    let html = state.render("index.html", context! {
+        title => "Simple Axum Server",
+        heading => "Welcome to the Simple Axum Server",
+        message => "This page is rendered using Tera templates with Pico.css and HTMX.",
+    }).unwrap();
 
     (
         [(header::CONTENT_TYPE, "text/html"), (header::CACHE_CONTROL, "no-cache")],
@@ -110,11 +130,10 @@ async fn index(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn new_poll_form(State(state): State<AppState>) -> impl IntoResponse {
-    let mut context = tera::Context::new();
-    context.insert("title", "Create New Poll");
-    context.insert("options", &vec!(None::<String>, None, None));
-
-    let html = state.tera.render("new_poll.html", &context).unwrap();
+    let html = state.render("new_poll.html", context! {
+        title => "Create New Poll",
+        options => &vec!(None::<String>, None, None),
+    }).unwrap();
 
     (
         [(header::CONTENT_TYPE, "text/html"), (header::CACHE_CONTROL, "no-cache")],
@@ -217,13 +236,11 @@ async fn create_poll(
 }
 
 async fn new_poll_new_option(State(state): State<AppState>) -> impl IntoResponse {
-    let mut context = Context::new();
-    context.insert("option", &None::<String>);
-    Html(state.tera.render("new_poll_new_option.html", &context).unwrap())
+    Html(state.render("new_poll_new_option.html", context! {option => None::<String>}).unwrap())
 }
 
 async fn new_poll_del_option(State(state): State<AppState>) -> impl IntoResponse {
-    Html(state.tera.render("new_poll_del_option.html", &Context::default()).unwrap())
+    Html(state.render("new_poll_del_option.html", context! {}).unwrap())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -379,7 +396,7 @@ async fn view_poll(
     State(state): State<AppState>,
     Path(token): Path<Token>,
     cookies: CookieJar,
-) -> impl IntoResponse {
+) -> Result<Response, Response> {
     match query_poll(&state.db, &token).await {
         Ok(Some(Poll { title, admin_token, description, expiration, board })) => {
             let is_expired = OffsetDateTime::now_utc() > expiration;
@@ -397,33 +414,41 @@ async fn view_poll(
                 Ok(b) => b,
                 Err(e) => {
                     eprint!("Error loading board: {}: {:?}", token, e);
-                    return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response();
+                    return Ok((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
                 },
             };
 
-            let mut context = tera::Context::new();
-            context.insert("title", &title);
-            context.insert("description", &description);
-            context.insert("expiration", &expiration.format(&Rfc3339).unwrap());
-            context.insert("token", &token);
-            context.insert("board", &board);
-            context.insert("is_expired", &is_expired);
-            context.insert("is_admin", &is_admin);
+            let mut context = context! {
+                title => &title,
+                description => &description,
+                expiration => &expiration.format(&Rfc3339).unwrap(),
+                token => &token,
+                board => &board,
+                is_expired => &is_expired,
+                is_admin => &is_admin,
+            };
             if !is_expired {
-                context.insert("new_voter_url", &format!("/poll/{}/new_voter", token));
+                context = context!{
+                    new_voter_url => &format!("/poll/{}/new_voter", token),
+                    ..context
+                };
             }
             if is_admin {
-                context.insert("admin_share_url", &format!("/poll/{}/admin/share", token));
-                context.insert("edit_url", &format!("/poll/{}/admin/edit", token));
+                context = context!{
+                    admin_share_url => &format!("/poll/{}/admin/share", token),
+                    edit_url => &format!("/poll/{}/admin/edit", token),
+                    ..context
+                };
             }
 
-            let html = state.tera.render("view_poll.html", &context).unwrap();
-            Html(html).into_response()
+            let html = state.render("view_poll.html", context)?;
+            Ok(Html(html).into_response())
         },
-        Ok(None) => (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(),
+        // todo: better 404 page
+        Ok(None) => Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response()),
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response()
+            Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response())
         },
     }
 }
@@ -453,11 +478,12 @@ async fn share_admin(
                 .map(|t| t.value() == poll.admin_token)
                 .unwrap_or(false);
 
-            let mut context = tera::Context::new();
-            context.insert("is_admin", &is_admin);
-            context.insert("admin_url", &format!("/poll/{}/admin/{}", token, poll.admin_token));
+            let context = context! {
+                is_admin => &is_admin,
+                admin_url => &format!("/poll/{}/admin/{}", token, poll.admin_token),
+            };
 
-            let html = state.tera.render("share_poll.html", &context).unwrap();
+            let html = state.render("share_poll.html", context).unwrap();
             Html(html).into_response()
         },
         Ok(None) => (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(),
@@ -524,8 +550,7 @@ async fn new_voter(
     cookies: CookieJar,
     Form(new_voter): Form<NewVoterForm>,
 ) -> impl IntoResponse {
-    let mut context = Context::new();
-    context.insert("new_voter_url", &format!("/poll/{}/new_voter", token));
+    let defaults = context!{new_voter_url => &format!("/poll/{}/new_voter", token)};
 
     let poll = match sqlx::query!(
         r#"
@@ -544,10 +569,14 @@ async fn new_voter(
     ).fetch_optional(&state.db).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            context.insert("error", "poll not found");
-            context.insert("error_fixable", &false);
-
-            let html = state.tera.render("frag-new-voter-form.html", &context).unwrap();
+            let html = state.render(
+                "frag-new-voter-form.html",
+                context!{
+                    error => "poll not found",
+                    error_fixable => &false,
+                    ..defaults,
+                },
+            ).unwrap();
             return (axum::http::StatusCode::NOT_FOUND, Html(html)).into_response();
         },
         Err(e) => {
@@ -557,28 +586,40 @@ async fn new_voter(
     };
     let is_expired = OffsetDateTime::now_utc() > poll.expiration;
     if is_expired {
-        context.insert("error", "the poll has expired");
-        context.insert("error_fixable", &false);
-
-        let html = state.tera.render("frag-new-voter-form.html", &context).unwrap();
+        let html = state.render(
+            "frag-new-voter-form.html",
+            context! {
+                error => "the poll has expired",
+                error_fixable => &false,
+                ..defaults,
+            },
+        ).unwrap();
         return (axum::http::StatusCode::GONE, Html(html)).into_response();
     }
 
     let name = new_voter.name.trim().to_string();
     if name.is_empty() {
-        context.insert("error", "you have to provide a name");
-        context.insert("error_fixable", &true);
-
-        let html = state.tera.render("frag-new-voter-form.html", &context).unwrap();
+        let html = state.render(
+            "frag-new-voter-form.html",
+            context! {
+                error => "you have to provide a name",
+                error_fixable => &true,
+                ..defaults,
+            },
+        ).unwrap();
         return (axum::http::StatusCode::BAD_REQUEST, Html(html)).into_response();
     }
     // todo: lowercase names for comparison
     if poll.voters.contains(&name) {
-        context.insert("error", "name already in use");
-        context.insert("error_fixable", &true);
-        context.insert("voter_name", &name);
-
-        let html = state.tera.render("frag-new-voter-form.html", &context).unwrap();
+        let html = state.render(
+            "frag-new-voter-form.html",
+            context! {
+                error => "name already in use",
+                error_fixable => &true,
+                voter_name => &name,
+                ..defaults,
+            },
+        ).unwrap();
         return (axum::http::StatusCode::BAD_REQUEST, Html(html)).into_response();
     }
 
@@ -625,7 +666,7 @@ async fn vote(
     Path(token): Path<Token>,
     cookies: CookieJar,
     Form(vote): Form<VoteForm>,
-) -> impl IntoResponse {
+) -> Result<Response, Response> {
     let q = match sqlx::query!(
         r#"
             SELECT
@@ -645,10 +686,10 @@ async fn vote(
         token,
     ).fetch_optional(&state.db).await {
         Ok(Some(q)) => q,
-        Ok(None) => { return (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(); },
+        Ok(None) => { return Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response()); },
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response();
+            return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
         },
     };
 
@@ -665,12 +706,12 @@ async fn vote(
     if !q.is_expired {
         let Some(edit_token) = q.voters.get(&vote.voter) else {
             eprintln!("Voter not in poll: {}: '{}'", token, vote.voter);
-            return (axum::http::StatusCode::BAD_REQUEST, "Voter not found").into_response();
+            return Err((axum::http::StatusCode::BAD_REQUEST, "Voter not found").into_response());
         };
         let is_voter = edit_cookie_value == Some(&edit_token.to_string());
         if !(is_voter || is_admin) {
             eprintln!("Error registering vote: {}: neither admin nor voter", token);
-            return (axum::http::StatusCode::FORBIDDEN, "Forbidden: neither admin nor voter").into_response();
+            return Err((axum::http::StatusCode::FORBIDDEN, "Forbidden: neither admin nor voter").into_response());
         }
 
         // everything is verified, now upsert the vote
@@ -694,17 +735,17 @@ async fn vote(
             Ok(_) => { eprintln!("Did it!"); },
             Err(e) => {
                 eprintln!("Error upserting vote: {}: {:?}", token, e);
-                return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error registering vote").into_response();
+                return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error registering vote").into_response());
             }
         }
     }
 
     let poll = match query_poll(&state.db, &token).await {
         Ok(Some(poll)) => poll,
-        Ok(None) => { return (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(); },
+        Ok(None) => { return Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response()); },
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response();
+            return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
         },
     };
 
@@ -712,20 +753,11 @@ async fn vote(
         Ok(b) => b,
         Err(e) => {
             eprintln!("Error loading board: {}: {:?}", token, e);
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response();
+            return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
         },
     };
 
-    let mut context = tera::Context::new();
-    context.insert("board", &board);
-
-    match state.tera.render("frag-board.html", &context) {
-        Ok(html) => Html(html).into_response(),
-        Err(e) => {
-            eprintln!("Template rendering error: {:?}", e);
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error rendering template").into_response()
-        }
-    }
+    Ok(Html(state.render("frag-board.html", context! { board })?).into_response())
 }
 
 fn make_admin_cookie(poll: &Token, admin: &Token, expiration: OffsetDateTime) -> Cookie<'static> {

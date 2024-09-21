@@ -17,13 +17,13 @@
             <td>
                 {% if board.can_edit_by_voters[loop.index0] %}
                 <select
-                    hx-vals='{"voter": "{{board.voter_names[loop.index0]}}", "option": "{{board.option_names[option_index]}}"}'
+                    hx-vals='{{ {"voter": board.voter_names[loop.index0], "option": board.option_names[option_index] } | tojson }}'
                     hx-post="{{ board.change_vote_url }}"
                     hx-target="closest .board"
                     hx-swap="outerHTML"
                     name="vote"
                 >
-                    {% for i in range(end=11) %}
+                    {% for i in range(11) %}
                     <option {% if vote == i * -1 %}selected{% endif %}>{{i * -1}}</option>
                     {% endfor %}
                 </select>

@@ -1,5 +1,5 @@
 <fieldset role="group">
-    <input type="text" name="options" value="{{option}}">
+    <input type="text" name="options" value="{{option if option is not none}}">
     <button
         hx-get="/poll/new/del-option"
         hx-target="closest fieldset"

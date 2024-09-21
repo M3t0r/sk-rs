@@ -9,7 +9,7 @@
         <small><i class="fas fa-exclamation-circle"></i> This poll has expired and is no longer active.</small>
     </p>
     {% else %}
-    <p>Expiration Date: {{ expiration|date }}</p>
+    <p>Expiration Date: {{ expiration|dateformat }}</p>
     {% endif %}
     {% if is_admin %}
     <nav>
