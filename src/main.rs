@@ -265,7 +265,8 @@ struct RenderableBoard<'a> {
     by_options: Vec<Vec<Vote>>,
     by_voters: Vec<Vec<Vote>>,
     can_edit_by_voters: Vec<bool>,
-    score_by_options: Vec<i64>,
+    sum_by_options: Vec<i64>,
+    score_by_options: Vec<f32>,
     change_vote_url: String,
 }
 
@@ -286,6 +287,7 @@ impl<'a> RenderableBoard<'a> {
         dst.voter_names = src.by_voters.keys()
             .map(|s| s.as_str())
             .collect();
+        let num_voters = dst.voter_names.len();
 
         for (voter, votes) in &src.by_voters {
             if votes.votes.len() != num_options {
@@ -315,9 +317,13 @@ impl<'a> RenderableBoard<'a> {
             )
             .collect();
 
-        dst.score_by_options = dst.by_options
+        dst.sum_by_options = dst.by_options
             .iter()
             .map(|o| o.iter().fold(0i64, |a, i| a + (*i as i64)))
+            .collect();
+        dst.score_by_options = dst.sum_by_options
+            .iter()
+            .map(|s| *s as f32 / num_voters as f32)
             .collect();
 
         Ok(dst)

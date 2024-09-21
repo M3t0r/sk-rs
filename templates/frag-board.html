@@ -2,10 +2,10 @@
     <thead>
         <tr>
             <th>Options</th>
+            <th>Total</th>
             {% for voter_name in board.voter_names %}
             <th>{{voter_name}}</th>
             {% endfor %}
-            <th>Total</th>
         </tr>
     </thead>
     <tbody>
@@ -13,6 +13,7 @@
         {% set option_index = loop.index0 %}
         <tr>
             <th>{{ board.option_names[option_index] }}</th>
+            <th class="score">{{ board.score_by_options[option_index]|round(1) }}</th>
             {% for vote in row %}
             <td>
                 {% if board.can_edit_by_voters[loop.index0] %}
@@ -32,7 +33,6 @@
                 {% endif %}
             </td>
             {% endfor %}
-            <th class="score">{{ board.score_by_options[option_index] }}</th>
         </tr>
         {% endfor %}
     </tbody>
