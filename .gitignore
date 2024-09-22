@@ -1,1 +1,5 @@
 /target
+database.sqlite*
+
+.sqlx/make_sentinel
+.sqlx/prepare.db
