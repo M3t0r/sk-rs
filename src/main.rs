@@ -1,15 +1,26 @@
 use axum::{
-    extract::{Path, State}, http::{header, StatusCode}, response::{IntoResponse, Redirect, Response}, routing::{get, post}, Router
+    extract::{Path, State},
+    http::{header, StatusCode},
+    response::{IntoResponse, Redirect, Response},
+    routing::{get, post},
+    Router,
 };
-use axum_extra::{extract::{cookie::Cookie, CookieJar, Form}, response::Html};
+use axum_extra::{
+    extract::{cookie::Cookie, CookieJar, Form},
+    response::Html,
+};
 use axum_htmx::{AutoVaryLayer, HxRefresh};
+use clap::Parser;
 use minijinja::{context, Environment, Value};
 use serde::{Deserialize, Serialize};
-use clap::Parser;
-use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
+use sqlx::{
+    migrate::MigrateError,
+    sqlite::{SqliteConnectOptions, SqlitePool},
+    types::Json,
+    QueryBuilder,
+};
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf, str::FromStr};
-use tokio;
-use sqlx::{migrate::MigrateError, sqlite::{SqliteConnectOptions, SqlitePool}, QueryBuilder, types::Json};
+use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
 use tower_http::services::ServeDir;
 
 mod token;
@@ -45,18 +56,22 @@ impl AppState {
         }
     }
     pub fn render(&self, template: &str, context: Value) -> Result<String, Response> {
-        let tpl = self.tpl
-            .get_template(template)
-            .map_err(|e| {
-                self.log_minijinja_error(&format!("Failed to load template: '{}'", template), e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to prepare a response").into_response()
-            })?;
-        tpl
-            .render(context)
-            .map_err(|e| {
-                self.log_minijinja_error(&format!("Failed to render template: '{}'", template), e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Failed to prepare a response").into_response()
-            })
+        let tpl = self.tpl.get_template(template).map_err(|e| {
+            self.log_minijinja_error(&format!("Failed to load template: '{}'", template), e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to prepare a response",
+            )
+                .into_response()
+        })?;
+        tpl.render(context).map_err(|e| {
+            self.log_minijinja_error(&format!("Failed to render template: '{}'", template), e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to prepare a response",
+            )
+                .into_response()
+        })
     }
 }
 
@@ -65,10 +80,9 @@ async fn migrate(pool: &SqlitePool) -> Result<(), MigrateError> {
 }
 
 fn slugify(value: String) -> String {
-    value.to_lowercase()
-        .split(|c: char| {
-            c.is_whitespace() || c.is_ascii_punctuation() || c.is_control()
-        })
+    value
+        .to_lowercase()
+        .split(|c: char| c.is_whitespace() || c.is_ascii_punctuation() || c.is_control())
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("-")
@@ -115,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest_service("/static", ServeDir::new(PathBuf::from("static")))
         .layer(compression)
         .layer(AutoVaryLayer)
-        .with_state(AppState{tpl, db: pool});
+        .with_state(AppState { tpl, db: pool });
 
     println!("Listening on {}", args.bind);
 
@@ -127,27 +141,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn index(State(state): State<AppState>) -> impl IntoResponse {
-    let html = state.render("index.html", context! {
-        title => "Simple Axum Server",
-        heading => "Welcome to the Simple Axum Server",
-        message => "This page is rendered using Tera templates with Pico.css and HTMX.",
-    }).unwrap();
+    let html = state
+        .render(
+            "index.html",
+            context! {
+                title => "Simple Axum Server",
+                heading => "Welcome to the Simple Axum Server",
+                message => "This page is rendered using Tera templates with Pico.css and HTMX.",
+            },
+        )
+        .unwrap();
 
     (
-        [(header::CONTENT_TYPE, "text/html"), (header::CACHE_CONTROL, "no-cache")],
-        Html(html)
+        [
+            (header::CONTENT_TYPE, "text/html"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        Html(html),
     )
 }
 
 async fn new_poll_form(State(state): State<AppState>) -> impl IntoResponse {
-    let html = state.render("new_poll.html", context! {
-        title => "Create New Poll",
-        options => &vec!(None::<String>, None, None),
-    }).unwrap();
+    let html = state
+        .render(
+            "new_poll.html",
+            context! {
+                title => "Create New Poll",
+                options => &vec!(None::<String>, None, None),
+            },
+        )
+        .unwrap();
 
     (
-        [(header::CONTENT_TYPE, "text/html"), (header::CACHE_CONTROL, "no-cache")],
-        Html(html)
+        [
+            (header::CONTENT_TYPE, "text/html"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        Html(html),
     )
 }
 
@@ -165,30 +195,34 @@ async fn create_poll(
 ) -> impl IntoResponse {
     let token = Token::new();
     let admin_token = Token::new();
-    
+
     // Generate expiration date
     let expiration = OffsetDateTime::now_utc() + Duration::days(90);
 
     // Gather options
-    let options: Vec<_> = new_poll.options.iter()
+    let options: Vec<_> = new_poll
+        .options
+        .iter()
         .map(|s| s.trim())
-        .filter(|s| s.len() > 0)
+        .filter(|s| !s.is_empty())
         .collect();
 
     if options.len() > MAX_OPTIONS {
         eprintln!("Failed to create poll: too many options: {}", options.len());
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to create poll"
-        ).into_response();
+            "Failed to create poll",
+        )
+            .into_response();
     }
 
     let Ok(mut tx) = state.db.begin().await else {
         eprintln!("Failed to create poll: transaction error");
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to create poll"
-        ).into_response();
+            "Failed to create poll",
+        )
+            .into_response();
     };
 
     // Insert the new poll into the database
@@ -210,26 +244,27 @@ async fn create_poll(
         ).into_response();
     };
 
-    let mut query = QueryBuilder::new("INSERT INTO options(poll_token, name)" );
-    query.push_values(
-        options,
-        |mut b, option| { b.push_bind(&token).push_bind(option); }
-    );
+    let mut query = QueryBuilder::new("INSERT INTO options(poll_token, name)");
+    query.push_values(options, |mut b, option| {
+        b.push_bind(&token).push_bind(option);
+    });
     let query = query.build();
     if let Err(e) = query.execute(&mut *tx).await {
         eprintln!("Failed to create poll options: {}", e);
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to create poll"
-        ).into_response();
+            "Failed to create poll",
+        )
+            .into_response();
     }
 
     if let Err(e) = tx.commit().await {
         eprintln!("Failed to create poll options: {}", e);
         return (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to create poll"
-        ).into_response();
+            "Failed to create poll",
+        )
+            .into_response();
     }
 
     let mut response = Redirect::to(&format!("/poll/{}/view", token)).into_response();
@@ -240,17 +275,30 @@ async fn create_poll(
             token,
             admin_token,
             Duration::days(90).whole_seconds()
-        ).parse().expect("admin token cookie generation")
+        )
+        .parse()
+        .expect("admin token cookie generation"),
     );
     response
 }
 
 async fn new_poll_new_option(State(state): State<AppState>) -> impl IntoResponse {
-    Html(state.render("new_poll_new_option.html", context! {option => None::<String>}).unwrap())
+    Html(
+        state
+            .render(
+                "new_poll_new_option.html",
+                context! {option => None::<String>},
+            )
+            .unwrap(),
+    )
 }
 
 async fn new_poll_del_option(State(state): State<AppState>) -> impl IntoResponse {
-    Html(state.render("new_poll_del_option.html", context! {}).unwrap())
+    Html(
+        state
+            .render("new_poll_del_option.html", context! {})
+            .unwrap(),
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -277,7 +325,7 @@ fn score_class(vote: &f32) -> &'static str {
     }
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize)]
 struct RenderableBoard<'a> {
     voter_names: Vec<&'a str>,
     option_names: Vec<&'a str>,
@@ -295,69 +343,66 @@ impl<'a> RenderableBoard<'a> {
         src: &'a Board,
         poll_token: &Token,
         is_admin: bool,
-        edit_token: Option<&str>
+        edit_token: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut dst = Self::default();
-        dst.change_vote_url = format!("/poll/{}/vote", poll_token);
+        let change_vote_url = format!("/poll/{}/vote", poll_token);
 
-        dst.option_names = src.options.iter()
-            .map(|s| s.as_str())
-            .collect();
-        let num_options = dst.option_names.len();
-        dst.voter_names = src.by_voters.keys()
-            .map(|s| s.as_str())
-            .collect();
-        let num_voters = dst.voter_names.len();
+        let option_names: Vec<_> = src.options.iter().map(|s| s.as_str()).collect();
+        let num_options = option_names.len();
+        let voter_names: Vec<_> = src.by_voters.keys().map(|s| s.as_str()).collect();
+        let num_voters = voter_names.len();
 
+        let mut by_voters = vec![];
+        let mut can_edit_by_voters = vec![];
         for (voter, votes) in &src.by_voters {
             if votes.votes.len() != num_options {
-                return Err(
-                    format!(
-                        "{}: wrong number of votes: has {}, wants {}",
-                        voter,
-                        votes.votes.len(),
-                        num_options
-                    ).into()
-                );
+                return Err(format!(
+                    "{}: wrong number of votes: has {}, wants {}",
+                    voter,
+                    votes.votes.len(),
+                    num_options
+                )
+                .into());
             }
-            dst.by_voters.push(votes.votes.clone());
-            dst.can_edit_by_voters.push(is_admin || edit_token == Some(&votes.edit_token));
+            by_voters.push(votes.votes.clone());
+            can_edit_by_voters.push(is_admin || edit_token == Some(&votes.edit_token));
         }
 
-        dst.by_options = (0..num_options)
-            .map(
-                |i|
-                {
-                    src.by_voters
-                        .values()
-                        // bounds already checked while iterating over by_voters
-                        .map(|v| v.votes[i].to_owned())
-                        .collect()
-                }
-            )
+        let by_options: Vec<Vec<_>> = (0..num_options)
+            .map(|i| {
+                src.by_voters
+                    .values()
+                    // bounds already checked while iterating over by_voters
+                    .map(|v| v.votes[i].to_owned())
+                    .collect()
+            })
             .collect();
 
-        dst.sum_by_options = dst.by_options
+        let sum_by_options: Vec<_> = by_options
             .iter()
             .map(|o| o.iter().fold(0i64, |a, i| a + (*i as i64)))
             .collect();
-        dst.score_by_options = dst.sum_by_options
+        let mut score_by_options: Vec<_> = sum_by_options
             .iter()
             .map(|s| *s as f32 / num_voters as f32)
             .collect();
         if num_voters == 0 {
             // avoid NaN as average
-            dst.score_by_options = dst.sum_by_options
-                .iter()
-                .map(|_| 0f32)
-                .collect();
+            score_by_options = sum_by_options.iter().map(|_| 0f32).collect();
         }
-        dst.score_class_by_options = dst.score_by_options
-            .iter()
-            .map(score_class)
-            .collect();
+        let score_class_by_options = score_by_options.iter().map(score_class).collect();
 
-        Ok(dst)
+        Ok(RenderableBoard {
+            voter_names,
+            option_names,
+            by_options,
+            by_voters,
+            can_edit_by_voters,
+            sum_by_options,
+            score_by_options,
+            score_class_by_options,
+            change_vote_url,
+        })
     }
 }
 
@@ -435,24 +480,30 @@ async fn view_poll(
     cookies: CookieJar,
 ) -> Result<Response, Response> {
     match query_poll(&state.db, &token).await {
-        Ok(Some(Poll { title, admin_token, description, expiration, board })) => {
+        Ok(Some(Poll {
+            title,
+            admin_token,
+            description,
+            expiration,
+            board,
+        })) => {
             let is_expired = OffsetDateTime::now_utc() > expiration;
 
-            let edit_cookie_value = cookies
-                .get(&format!("edit_{}", token))
-                .map(|c| c.value());
+            let edit_cookie_value = cookies.get(&format!("edit_{}", token)).map(|c| c.value());
 
-            let admin_cookie_value = cookies
-                .get(&format!("admin_{}", token))
-                .map(|c| c.value());
-            let is_admin = admin_cookie_value == Some(&admin_token.to_string());
+            let admin_cookie_value = cookies.get(&format!("admin_{}", token)).map(|c| c.value());
+            let is_admin = admin_cookie_value == Some(admin_token.as_ref());
 
             let board = match RenderableBoard::from(&board, &token, is_admin, edit_cookie_value) {
                 Ok(b) => b,
                 Err(e) => {
                     eprint!("Error loading board: {}: {:?}", token, e);
-                    return Ok((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
-                },
+                    return Ok((
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "Error fetching poll",
+                    )
+                        .into_response());
+                }
             };
 
             let mut context = context! {
@@ -465,13 +516,13 @@ async fn view_poll(
                 is_admin => &is_admin,
             };
             if !is_expired {
-                context = context!{
+                context = context! {
                     new_voter_url => &format!("/poll/{}/new_voter", token),
                     ..context
                 };
             }
             if is_admin {
-                context = context!{
+                context = context! {
                     admin_share_url => &format!("/poll/{}/admin/share", token),
                     edit_url => &format!("/poll/{}/admin/edit", token),
                     ..context
@@ -480,13 +531,17 @@ async fn view_poll(
 
             let html = state.render("view_poll.html", context)?;
             Ok(Html(html).into_response())
-        },
+        }
         // todo: better 404 page
         Ok(None) => Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response()),
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response())
-        },
+            Err((
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response())
+        }
     }
 }
 
@@ -505,8 +560,8 @@ async fn share_admin(
         "#,
         token
     )
-        .fetch_optional(&state.db)
-        .await;
+    .fetch_optional(&state.db)
+    .await;
 
     match poll {
         Ok(Some(poll)) => {
@@ -522,12 +577,16 @@ async fn share_admin(
 
             let html = state.render("share_poll.html", context).unwrap();
             Html(html).into_response()
-        },
+        }
         Ok(None) => (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(),
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response()
-        },
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -556,23 +615,31 @@ async fn login_admin(
         "#,
         token
     )
-        .fetch_optional(&state.db)
-        .await;
+    .fetch_optional(&state.db)
+    .await;
 
     match poll {
         Ok(Some(poll)) => {
             if poll.admin_token == admin_token {
-                let cookies = cookies.add(make_admin_cookie(&poll.token, &poll.admin_token, poll.expiration));
+                let cookies = cookies.add(make_admin_cookie(
+                    &poll.token,
+                    &poll.admin_token,
+                    poll.expiration,
+                ));
                 (cookies, Redirect::to(&format!("/poll/{}/view", token))).into_response()
             } else {
                 (axum::http::StatusCode::FORBIDDEN, "Wrong Admin Token").into_response()
             }
-        },
+        }
         Ok(None) => (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(),
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response()
-        },
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response()
+        }
     }
 }
 
@@ -587,7 +654,7 @@ async fn new_voter(
     cookies: CookieJar,
     Form(new_voter): Form<NewVoterForm>,
 ) -> impl IntoResponse {
-    let defaults = context!{new_voter_url => &format!("/poll/{}/new_voter", token)};
+    let defaults = context! {new_voter_url => &format!("/poll/{}/new_voter", token)};
 
     let poll = match sqlx::query!(
         r#"
@@ -603,60 +670,75 @@ async fn new_voter(
                 token = ?
         "#,
         token,
-    ).fetch_optional(&state.db).await {
+    )
+    .fetch_optional(&state.db)
+    .await
+    {
         Ok(Some(p)) => p,
         Ok(None) => {
-            let html = state.render(
-                "frag-new-voter-form.html",
-                context!{
-                    error => "poll not found",
-                    error_fixable => &false,
-                    ..defaults,
-                },
-            ).unwrap();
+            let html = state
+                .render(
+                    "frag-new-voter-form.html",
+                    context! {
+                        error => "poll not found",
+                        error_fixable => &false,
+                        ..defaults,
+                    },
+                )
+                .unwrap();
             return (axum::http::StatusCode::NOT_FOUND, Html(html)).into_response();
-        },
+        }
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response();
-        },
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response();
+        }
     };
     let is_expired = OffsetDateTime::now_utc() > poll.expiration;
     if is_expired {
-        let html = state.render(
-            "frag-new-voter-form.html",
-            context! {
-                error => "the poll has expired",
-                error_fixable => &false,
-                ..defaults,
-            },
-        ).unwrap();
+        let html = state
+            .render(
+                "frag-new-voter-form.html",
+                context! {
+                    error => "the poll has expired",
+                    error_fixable => &false,
+                    ..defaults,
+                },
+            )
+            .unwrap();
         return (axum::http::StatusCode::GONE, Html(html)).into_response();
     }
 
     let name = new_voter.name.trim().to_string();
     if name.is_empty() {
-        let html = state.render(
-            "frag-new-voter-form.html",
-            context! {
-                error => "you have to provide a name",
-                error_fixable => &true,
-                ..defaults,
-            },
-        ).unwrap();
+        let html = state
+            .render(
+                "frag-new-voter-form.html",
+                context! {
+                    error => "you have to provide a name",
+                    error_fixable => &true,
+                    ..defaults,
+                },
+            )
+            .unwrap();
         return (axum::http::StatusCode::BAD_REQUEST, Html(html)).into_response();
     }
     // todo: lowercase names for comparison
     if poll.voters.contains(&name) {
-        let html = state.render(
-            "frag-new-voter-form.html",
-            context! {
-                error => "name already in use",
-                error_fixable => &true,
-                voter_name => &name,
-                ..defaults,
-            },
-        ).unwrap();
+        let html = state
+            .render(
+                "frag-new-voter-form.html",
+                context! {
+                    error => "name already in use",
+                    error_fixable => &true,
+                    voter_name => &name,
+                    ..defaults,
+                },
+            )
+            .unwrap();
         return (axum::http::StatusCode::BAD_REQUEST, Html(html)).into_response();
     }
 
@@ -666,9 +748,16 @@ async fn new_voter(
         edit_token = match edit_cookie.value().parse() {
             Ok(t) => t,
             Err(e) => {
-                eprintln!("Invalid editor token while adding new voter: {}: {:?}", token, e);
-                return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Invalid editor token").into_response();
-            },
+                eprintln!(
+                    "Invalid editor token while adding new voter: {}: {:?}",
+                    token, e
+                );
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Invalid editor token",
+                )
+                    .into_response();
+            }
         }
     }
 
@@ -682,9 +771,16 @@ async fn new_voter(
         name,
         token,
         edit_token,
-    ).execute(&state.db).await {
+    )
+    .execute(&state.db)
+    .await
+    {
         eprintln!("Error adding new voter: {}: {:?}", token, e);
-        return (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error adding new voter").into_response();
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "Error adding new voter",
+        )
+            .into_response();
     }
 
     let cookies = cookies.add(make_edit_token(&token, &edit_token, poll.expiration));
@@ -721,34 +817,43 @@ async fn vote(
                 polls.rowid
         "#,
         token,
-    ).fetch_optional(&state.db).await {
+    )
+    .fetch_optional(&state.db)
+    .await
+    {
         Ok(Some(q)) => q,
-        Ok(None) => { return Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response()); },
+        Ok(None) => {
+            return Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response());
+        }
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
-        },
+            return Err((
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response());
+        }
     };
 
     eprintln!("{:?}", q);
 
-    let edit_cookie_value = cookies
-        .get(&format!("edit_{}", token))
-        .map(|c| c.value());
-    let admin_cookie_value = cookies
-        .get(&format!("admin_{}", token))
-        .map(|c| c.value());
-    let is_admin = admin_cookie_value == Some(&q.admin_token.to_string());
+    let edit_cookie_value = cookies.get(&format!("edit_{}", token)).map(|c| c.value());
+    let admin_cookie_value = cookies.get(&format!("admin_{}", token)).map(|c| c.value());
+    let is_admin = admin_cookie_value == Some(q.admin_token.as_ref());
 
     if !q.is_expired {
         let Some(edit_token) = q.voters.get(&vote.voter) else {
             eprintln!("Voter not in poll: {}: '{}'", token, vote.voter);
             return Err((axum::http::StatusCode::BAD_REQUEST, "Voter not found").into_response());
         };
-        let is_voter = edit_cookie_value == Some(&edit_token.to_string());
+        let is_voter = edit_cookie_value == Some(edit_token.as_ref());
         if !(is_voter || is_admin) {
             eprintln!("Error registering vote: {}: neither admin nor voter", token);
-            return Err((axum::http::StatusCode::FORBIDDEN, "Forbidden: neither admin nor voter").into_response());
+            return Err((
+                axum::http::StatusCode::FORBIDDEN,
+                "Forbidden: neither admin nor voter",
+            )
+                .into_response());
         }
 
         // everything is verified, now upsert the vote
@@ -768,30 +873,49 @@ async fn vote(
             vote.option,
             token,
             vote.vote
-        ).execute(&state.db).await {
-            Ok(_) => { eprintln!("Did it!"); },
+        )
+        .execute(&state.db)
+        .await
+        {
+            Ok(_) => {
+                eprintln!("Did it!");
+            }
             Err(e) => {
                 eprintln!("Error upserting vote: {}: {:?}", token, e);
-                return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error registering vote").into_response());
+                return Err((
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error registering vote",
+                )
+                    .into_response());
             }
         }
     }
 
     let poll = match query_poll(&state.db, &token).await {
         Ok(Some(poll)) => poll,
-        Ok(None) => { return Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response()); },
+        Ok(None) => {
+            return Err((axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response());
+        }
         Err(e) => {
             eprintln!("Error fetching poll: {}: {:?}", token, e);
-            return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
-        },
+            return Err((
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response());
+        }
     };
 
     let board = match RenderableBoard::from(&poll.board, &token, is_admin, edit_cookie_value) {
         Ok(b) => b,
         Err(e) => {
             eprintln!("Error loading board: {}: {:?}", token, e);
-            return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Error fetching poll").into_response());
-        },
+            return Err((
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response());
+        }
     };
 
     Ok(Html(state.render("frag-board.html", context! { board })?).into_response())

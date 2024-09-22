@@ -17,6 +17,15 @@ DATABASE := $(subst sqlite://,,${DATABASE_URL})
 dev:
 	cargo watch --ignore "$(basename ${DATABASE}).*" -- cargo run
 
+.PHONY: format
+format:
+	cargo fmt --all
+
+.PHONY: lint
+lint:
+	cargo clippy
+	cargo fmt --all --check
+
 .PHONY: tag
 tag:
 	( \

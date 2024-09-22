@@ -1,8 +1,8 @@
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize, de::{self, Visitor}};
+use serde::{de, Deserialize, Serialize};
+use sqlx::{Decode, Encode, Type};
 use std::fmt;
 use std::ops::Deref;
-use sqlx::{Encode, Decode, Type};
 
 const TOKEN_ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const TOKEN_LENGTH: usize = 18;
@@ -121,7 +121,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sqlx_encode_decode() {
-        use sqlx::{Sqlite, Pool};
+        use sqlx::{Pool, Sqlite};
 
         let pool = Pool::<Sqlite>::connect("sqlite::memory:").await.unwrap();
 
