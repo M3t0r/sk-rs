@@ -64,6 +64,15 @@ async fn migrate(pool: &SqlitePool) -> Result<(), MigrateError> {
     sqlx::migrate!("./migrations/").run(pool).await
 }
 
+fn slugify(value: String) -> String {
+    value.to_lowercase()
+        .split(|c: char| {
+            c.is_whitespace() || c.is_ascii_punctuation() || c.is_control()
+        })
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -82,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize Tera
     let mut tpl = Environment::new();
+    tpl.add_filter("slugify", slugify);
     minijinja_contrib::add_to_environment(&mut tpl);
     minijinja_embed::load_templates!(&mut tpl);
 

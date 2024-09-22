@@ -11,10 +11,12 @@
     <tbody>
         {% for row in board.by_options %}
         {% set option_index = loop.index0 %}
+        {% set option = board.option_names[option_index] %}
         <tr>
-            <th>{{ board.option_names[option_index] }}</th>
+            <th>{{ option }}</th>
             <th class="score">{{ board.score_by_options[option_index]|round(1) }}</th>
             {% for vote in row %}
+            {% set voter = board.voter_names[loop.index0] %}
             <td>
                 {% if board.can_edit_by_voters[loop.index0] %}
                 <select
@@ -23,6 +25,7 @@
                     hx-target="closest .board"
                     hx-swap="outerHTML"
                     name="vote"
+                    id="{{ ["vote", option, voter]|join("-")|slugify }}"
                 >
                     {% for i in range(11) %}
                     <option {% if vote == i * -1 %}selected{% endif %}>{{i * -1}}</option>
