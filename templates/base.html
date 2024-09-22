@@ -33,13 +33,48 @@
         });
     </script>
     <style>
-        .board select {
-            width: 5.5rem;
-            text-align: right;
+        :root {
+            --pico-color-light: #fff;
+            --pico-color-dark: #000;
+
+            --pico-color-red: #c52f21;
+            --pico-color-amber: #ffbf00;
+            --pico-color-jade: #00895a;
+
+            --pico-color-violet: #7540bf;
         }
-        .board .score {
-            /* total column */
-            text-align: right;
+
+        .board {
+            --pico-spacing: 0.5rem;
+
+            select {
+                width: 4.5rem;
+                text-align: right;
+                margin-bottom: 0;
+                --pico-form-element-spacing-horizontal: 0.5rem;
+                --pico-form-element-spacing-vertical: 0.25rem;
+            }
+            [data-tooltip] {
+                border-bottom: var(--pico-border-width) solid var(--pico-table-border-color);
+                text-decoration: underline dotted 1px;
+            }
+            .score {
+                /* total column */
+                text-align: right;
+                font-size: 0.6rlh;
+                div {
+                    height: 1cap;
+                    margin-bottom: 0.2lh; /* even vertical spacing in the table cell */
+                    margin-left: auto;
+                    border-radius: var(--pico-border-radius);
+                    background-color: var(--score-color);
+                }
+
+                &.good { --score-color: var(--pico-color-jade); }
+                &.medium { --score-color: var(--pico-color-amber); }
+                &.bad { --score-color: var(--pico-color-red); }
+                &.error { --score-color: var(--pico-color-violet); }
+            }
         }
     </style>
 

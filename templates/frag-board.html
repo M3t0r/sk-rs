@@ -1,10 +1,10 @@
 <table class="board" hx-disabled-elt=".board select[name='vote']">
     <thead>
         <tr>
-            <th>Options</th>
-            <th>Total</th>
-            {% for voter_name in board.voter_names %}
-            <th>{{voter_name}}</th>
+            <th>Option</th>
+            <th>Resistance</th>
+            {% for voter in board.voter_names %}
+            <th>{{voter}}</th>
             {% endfor %}
         </tr>
     </thead>
@@ -14,7 +14,14 @@
         {% set option = board.option_names[option_index] %}
         <tr>
             <th>{{ option }}</th>
-            <th class="score">{{ board.score_by_options[option_index]|round(1) }}</th>
+            <td
+                class="score {{ board.score_class_by_options[option_index] }}"
+                data-tooltip="Σ = {{ board.sum_by_options[option_index] }}, n = {{ board.voter_names|length }}"
+            >
+                {% set score = board.score_by_options[option_index] %}
+                <span>{{ score|round(1) }}&nbsp;⌀</span>
+                <div style="width: {{ (score|abs) * 9 + 10 | round(0) }}%"></div>
+            </td>
             {% for vote in row %}
             {% set voter = board.voter_names[loop.index0] %}
             <td>

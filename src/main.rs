@@ -268,6 +268,15 @@ struct Votes {
 
 type Vote = i8;
 
+fn score_class(vote: &f32) -> &'static str {
+    match vote {
+        -2f32..=0f32 => "good",
+        -7f32..=-2f32 => "medium",
+        -10f32..=-7f32 => "bad",
+        _ => "error",
+    }
+}
+
 #[derive(Debug, Serialize, Default)]
 struct RenderableBoard<'a> {
     voter_names: Vec<&'a str>,
@@ -277,6 +286,7 @@ struct RenderableBoard<'a> {
     can_edit_by_voters: Vec<bool>,
     sum_by_options: Vec<i64>,
     score_by_options: Vec<f32>,
+    score_class_by_options: Vec<&'a str>,
     change_vote_url: String,
 }
 
@@ -334,6 +344,17 @@ impl<'a> RenderableBoard<'a> {
         dst.score_by_options = dst.sum_by_options
             .iter()
             .map(|s| *s as f32 / num_voters as f32)
+            .collect();
+        if num_voters == 0 {
+            // avoid NaN as average
+            dst.score_by_options = dst.sum_by_options
+                .iter()
+                .map(|_| 0f32)
+                .collect();
+        }
+        dst.score_class_by_options = dst.score_by_options
+            .iter()
+            .map(score_class)
             .collect();
 
         Ok(dst)
