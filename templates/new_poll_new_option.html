@@ -1,10 +1,11 @@
 <fieldset role="group">
-    <input type="text" name="options" value="{{option if option is not none}}">
+    <input type="text" name="options" value="{{option if option is not none}}" autofocus>
     <button
         hx-get="/poll/new/del-option"
         hx-target="closest fieldset"
         hx-swap="outerHTML"
         class="outline"
+        aria-label="remove option"
     >
         <i class="fa-solid fa-trash"></i>
     </button>

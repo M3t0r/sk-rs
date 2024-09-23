@@ -2,18 +2,17 @@
 {% block markup %}
 <main class="container">
     <h1>Create New Poll</h1>
-    <form method="post" action="#">
+    <form method="post" action="#" aria-label="New Poll Form">
+        <label for="title">Poll Title</label>
+        <input autofocus type="text" id="title" name="title" placeholder="Enter poll title" required aria-label="Poll Title">
+
+        <label for="description">Description</label>
+        <textarea id="description" name="description" placeholder="Enter poll description" aria-label="Poll Description"></textarea>
+
+        <small>The poll will automatically expire after 90 days.</small>
+
         <fieldset>
-            <label for="title">Poll Title</label>
-            <input type="text" id="title" name="title" placeholder="Enter poll title" required aria-label="Poll Title">
-            
-            <label for="description">Description</label>
-            <textarea id="description" name="description" placeholder="Enter poll description" required aria-label="Poll Description"></textarea>
-            
-            <small>The poll will automatically expire after 90 days.</small>
-        </fieldset>
-        <fieldset>
-            <label>Options</label>
+            <legend>Options</legend>
             <div>
                 {% for option in options %}
                 {% include "new_poll_new_option.html" %}
@@ -29,7 +28,7 @@
                 </a>
             </div>
         </fieldset>
-        <button type="submit" aria-label="Create Poll">Create Poll</button>
+        <button type="submit">Create Poll</button>
     </form>
 </main>
 {% endblock %}
