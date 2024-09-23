@@ -81,6 +81,16 @@
                 &.error { --score-color: var(--pico-color-violet); }
             }
         }
+
+        footer {
+            text-align: center;
+            font-size: 12pt;
+            color: var(--pico-secondary);
+
+            svg {
+                height: 2lh;
+            }
+        }
     </style>
 
     {% block head %}{% endblock %}
@@ -91,5 +101,13 @@
         <blockquote id="error-dialog-message"></blockquote>
         <button formmethod="dialog">Close</button>
     </dialog>
+    <footer>
+        Made by
+        <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 16 16">
+            <desc>icon of a squirrel</desc>
+            <path d="M15.93 4.93c-.86-.6-.6-1.82-2.71-2.23-.72-.79-.06-1.17-1.26-1.92-.36.73-.37 1.26-.29 2.48-.97 2.83-3.13 3.08-4 5.01-.63 1.4-.75 2.36-.04 4.58-.72-.81-1.1-1.77-.66-3.26.81-2.67 2-3.45 1.25-5.78-.62-1.92-2.33-2.68-4.35-2.72A4.16 4.16 0 0 0 .14 3.97C-.23 5.5.51 8.3 2.07 8.23 1.3 5.66 2 3.95 3.55 4.15c1.47.2 1.73 1.47.28 4.16-1.71 3.2 2.32 6.36 4.16 6.38.86.83 1.43.2 1.88.13.23-.04.35.36.58.4l3.82-.01c.02-.88-.17-1.02-1-1.06-.95-.05-1.53.59-1.95.1 2.36-1.62.86-3.46.87-3.83.01-.47.96-.93 1.62-1.33.53-.32.5-1.25 1.05-1.52.42-.2.53.64 1.01-.1.27-.39-.15-1-.95-1.05-.57-.03-.93.98-1.5.61-.3-.2-.3-1.25.05-1.2.56.1 1.7.14 2.46-.9z"/>
+        </svg>
+        <span style="font-family: var(--pico-font-family-monospace);">$geno_name</span>
+    </footer>
 </body>
 </html>
