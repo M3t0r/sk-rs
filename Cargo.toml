@@ -17,7 +17,7 @@ serde_json = "1.0.128"
 axum-htmx = { version = "0.7.0", features = ["auto-vary"] }
 minijinja = { version = "2.3.1", features = ["unicode", "json", "preserve_order", "speedups", "urlencode"] }
 minijinja-embed = "2.3.1"
-minijinja-contrib = { version = "2.3.1", features = ["datetime"] }
+minijinja-contrib = { version = "2.3.1", features = ["datetime", "timezone"] }
 
 [dev-dependencies]
 serde_json = "1.0.128"

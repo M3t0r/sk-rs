@@ -5,11 +5,19 @@
     <p>{{ description }}</p>
     {% if is_expired %}
     <p>
-        Expiration Date: <del>{{ expiration }}</del>
-        <small><i class="fas fa-exclamation-circle"></i> This poll has expired and is no longer active.</small>
+        Expiration Date:
+        <del data-tooltip="{{ expiration|datetimeformat(format="iso", tz="UTC") }}">
+            {{ expiration|dateformat }}
+        </del>
+        <small><i class="fas fa-exclamation-circle"></i>&nbsp;This poll has expired and is no longer active.</small>
     </p>
     {% else %}
-    <p>Expiration Date: {{ expiration|dateformat }}</p>
+    <p>
+        Expiration Date:
+        <span data-tooltip="{{ expiration|datetimeformat(format="iso", tz="UTC") }}">
+            {{ expiration|dateformat }}
+        </span>
+    </p>
     {% endif %}
     {% if is_admin %}
     <nav>
