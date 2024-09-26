@@ -3,7 +3,7 @@
         <input
             name="name"
             type="text"
-            placeholder="Name"
+            placeholder="New Voter Name"
             {% if voter_name is defined %}value="{{voter_name}}"{% endif %}
             aria-describedby="new-voter-helper"
             {% if error is defined %}aria-invalid="true"{% endif %}

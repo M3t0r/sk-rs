@@ -141,16 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn index(State(state): State<AppState>) -> impl IntoResponse {
-    let html = state
-        .render(
-            "index.html",
-            context! {
-                title => "Simple Axum Server",
-                heading => "Welcome to the Simple Axum Server",
-                message => "This page is rendered using Tera templates with Pico.css and HTMX.",
-            },
-        )
-        .unwrap();
+    let html = state.render("index.html", context! {}).unwrap();
 
     (
         [
