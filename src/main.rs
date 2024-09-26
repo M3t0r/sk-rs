@@ -404,6 +404,10 @@ impl<'a> RenderableBoard<'a> {
             change_vote_url,
         })
     }
+
+    fn disable_votes(&mut self) {
+        self.can_edit_by_voters = vec![false; self.voter_names.len()];
+    }
 }
 
 #[derive(Debug)]
@@ -494,7 +498,8 @@ async fn view_poll(
             let admin_cookie_value = cookies.get(&format!("admin_{}", token)).map(|c| c.value());
             let is_admin = admin_cookie_value == Some(admin_token.as_ref());
 
-            let board = match RenderableBoard::from(&board, &token, is_admin, edit_cookie_value) {
+            let mut board = match RenderableBoard::from(&board, &token, is_admin, edit_cookie_value)
+            {
                 Ok(b) => b,
                 Err(e) => {
                     eprint!("Error loading board: {}: {:?}", token, e);
@@ -505,6 +510,10 @@ async fn view_poll(
                         .into_response());
                 }
             };
+
+            if is_expired {
+                board.disable_votes();
+            }
 
             let mut context = context! {
                 title => &title,
@@ -841,53 +850,55 @@ async fn vote(
     let admin_cookie_value = cookies.get(&format!("admin_{}", token)).map(|c| c.value());
     let is_admin = admin_cookie_value == Some(q.admin_token.as_ref());
 
-    if !q.is_expired {
-        let Some(edit_token) = q.voters.get(&vote.voter) else {
-            eprintln!("Voter not in poll: {}: '{}'", token, vote.voter);
-            return Err((axum::http::StatusCode::BAD_REQUEST, "Voter not found").into_response());
-        };
-        let is_voter = edit_cookie_value == Some(edit_token.as_ref());
-        if !(is_voter || is_admin) {
-            eprintln!("Error registering vote: {}: neither admin nor voter", token);
+    if q.is_expired {
+        return Ok((axum_htmx::HxRefresh(true), "Poll has expired").into_response());
+    }
+
+    let Some(edit_token) = q.voters.get(&vote.voter) else {
+        eprintln!("Voter not in poll: {}: '{}'", token, vote.voter);
+        return Err((axum::http::StatusCode::BAD_REQUEST, "Voter not found").into_response());
+    };
+    let is_voter = edit_cookie_value == Some(edit_token.as_ref());
+    if !(is_voter || is_admin) {
+        eprintln!("Error registering vote: {}: neither admin nor voter", token);
+        return Err((
+            axum::http::StatusCode::FORBIDDEN,
+            "Forbidden: neither admin nor voter",
+        )
+            .into_response());
+    }
+
+    // everything is verified, now upsert the vote
+    match sqlx::query!(
+        r#"
+            INSERT INTO votes (voter_id, option, poll_token, vote)
+            VALUES (
+                (SELECT id FROM voters WHERE poll_token = ? AND name = ?),
+                ?,
+                ?,
+                ?
+            )
+            ON CONFLICT (voter_id, option) DO UPDATE SET vote = excluded.vote
+        "#,
+        token,
+        vote.voter,
+        vote.option,
+        token,
+        vote.vote
+    )
+    .execute(&state.db)
+    .await
+    {
+        Ok(_) => {
+            eprintln!("Did it!");
+        }
+        Err(e) => {
+            eprintln!("Error upserting vote: {}: {:?}", token, e);
             return Err((
-                axum::http::StatusCode::FORBIDDEN,
-                "Forbidden: neither admin nor voter",
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error registering vote",
             )
                 .into_response());
-        }
-
-        // everything is verified, now upsert the vote
-        match sqlx::query!(
-            r#"
-                INSERT INTO votes (voter_id, option, poll_token, vote)
-                VALUES (
-                    (SELECT id FROM voters WHERE poll_token = ? AND name = ?),
-                    ?,
-                    ?,
-                    ?
-                )
-                ON CONFLICT (voter_id, option) DO UPDATE SET vote = excluded.vote
-            "#,
-            token,
-            vote.voter,
-            vote.option,
-            token,
-            vote.vote
-        )
-        .execute(&state.db)
-        .await
-        {
-            Ok(_) => {
-                eprintln!("Did it!");
-            }
-            Err(e) => {
-                eprintln!("Error upserting vote: {}: {:?}", token, e);
-                return Err((
-                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    "Error registering vote",
-                )
-                    .into_response());
-            }
         }
     }
 
@@ -906,7 +917,7 @@ async fn vote(
         }
     };
 
-    let board = match RenderableBoard::from(&poll.board, &token, is_admin, edit_cookie_value) {
+    let mut board = match RenderableBoard::from(&poll.board, &token, is_admin, edit_cookie_value) {
         Ok(b) => b,
         Err(e) => {
             eprintln!("Error loading board: {}: {:?}", token, e);
@@ -917,6 +928,10 @@ async fn vote(
                 .into_response());
         }
     };
+
+    if OffsetDateTime::now_utc() > poll.expiration {
+        board.disable_votes();
+    }
 
     Ok(Html(state.render("frag-board.html", context! { board })?).into_response())
 }
