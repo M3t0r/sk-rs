@@ -1,0 +1,8 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "github>m3t0r/renovate-presets:f-semantic"
+  ],
+  "assignees": ["m3t0r"]
+}
