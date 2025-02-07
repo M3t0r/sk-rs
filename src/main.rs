@@ -1,13 +1,12 @@
 use axum::{
     extract::{Path, State},
     http::{header, StatusCode},
-    response::{IntoResponse, Redirect, Response},
+    response::{IntoResponse, Redirect, Response, Html},
     routing::{get, post},
     Router,
 };
 use axum_extra::{
     extract::{cookie::Cookie, CookieJar, Form},
-    response::Html,
 };
 use axum_htmx::{AutoVaryLayer, HxRefresh};
 use clap::Parser;
@@ -120,12 +119,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/poll/new", get(new_poll_form).post(create_poll))
         .route("/poll/new/new-option", get(new_poll_new_option))
         .route("/poll/new/del-option", get(new_poll_del_option))
-        .route("/poll/:token/view", get(view_poll))
-        .route("/poll/:token/new_voter", post(new_voter))
-        .route("/poll/:token/vote", post(vote))
-        .route("/poll/:token/admin/edit", get(edit_poll))
-        .route("/poll/:token/admin/share", get(share_admin))
-        .route("/poll/:token/admin/:admin_token", get(login_admin))
+        .route("/poll/{token}/view", get(view_poll))
+        .route("/poll/{token}/new_voter", post(new_voter))
+        .route("/poll/{token}/vote", post(vote))
+        .route("/poll/{token}/admin/edit", get(edit_poll))
+        .route("/poll/{token}/admin/share", get(share_admin))
+        .route("/poll/{token}/admin/{admin_token}", get(login_admin))
         .nest_service("/static", ServeDir::new(PathBuf::from("static")))
         .layer(compression)
         .layer(AutoVaryLayer)

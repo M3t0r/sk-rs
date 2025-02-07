@@ -1,4 +1,4 @@
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use serde::{de, Deserialize, Serialize};
 use sqlx::{Decode, Encode, Type};
 use std::fmt;
@@ -12,7 +12,7 @@ pub struct Token(String);
 
 impl Token {
     pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let token: String = (0..TOKEN_LENGTH)
             .map(|_| *TOKEN_ALPHABET.as_bytes().choose(&mut rng).unwrap() as char)
             .collect();
