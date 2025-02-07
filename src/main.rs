@@ -87,6 +87,17 @@ fn slugify(value: String) -> String {
         .join("-")
 }
 
+fn render_markdown(value: String) -> minijinja::Value {
+    let mut options = pulldown_cmark::Options::empty();
+    options.insert(pulldown_cmark::Options::ENABLE_DEFINITION_LIST);
+    let parser = pulldown_cmark::Parser::new_ext(&value, options);
+
+    let mut html_buf = String::new();
+    pulldown_cmark::html::push_html(&mut html_buf, parser);
+
+    minijinja::Value::from_safe_string(html_buf)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
@@ -105,6 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize Tera
     let mut tpl = Environment::new();
     tpl.add_filter("slugify", slugify);
+    tpl.add_filter("markdown", render_markdown);
     minijinja_contrib::add_to_environment(&mut tpl);
     minijinja_embed::load_templates!(&mut tpl);
 

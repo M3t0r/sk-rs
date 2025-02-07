@@ -2,7 +2,7 @@
 {% block markup %}
 <main class="container">
     <h1>{{ title }}</h1>
-    <p>{{ description }}</p>
+    <p>{{ description|markdown }}</p>
     {% if is_expired %}
     <p>
         Expiration Date:
