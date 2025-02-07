@@ -331,6 +331,7 @@ fn score_class(vote: &f32) -> &'static str {
 struct RenderableBoard<'a> {
     voter_names: Vec<&'a str>,
     option_names: Vec<&'a str>,
+    option_is_link: Vec<bool>,
     by_options: Vec<Vec<Vote>>,
     by_voters: Vec<Vec<Vote>>,
     can_edit_by_voters: Vec<bool>,
@@ -394,9 +395,14 @@ impl<'a> RenderableBoard<'a> {
         }
         let score_class_by_options = score_by_options.iter().map(score_class).collect();
 
+        let option_is_link: Vec<_> = option_names.iter()
+            .map(|o| o.starts_with("https://") && o.len() > "https://".len())
+            .collect();
+
         Ok(RenderableBoard {
             voter_names,
             option_names,
+            option_is_link,
             by_options,
             by_voters,
             can_edit_by_voters,
