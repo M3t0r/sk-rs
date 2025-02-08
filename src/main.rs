@@ -5,10 +5,8 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use axum_extra::{
-    extract::{cookie::Cookie, CookieJar, Form},
-};
-use axum_htmx::{AutoVaryLayer, HxRefresh};
+use axum_extra::extract::{cookie::Cookie, CookieJar, Form, Host};
+use axum_htmx::{AutoVaryLayer, HxCurrentUrl, HxRefresh};
 use clap::Parser;
 use minijinja::{context, Environment, Value};
 use serde::{Deserialize, Serialize};
@@ -566,6 +564,8 @@ async fn share_admin(
     State(state): State<AppState>,
     Path(token): Path<Token>,
     cookies: CookieJar,
+    Host(host): Host,
+    HxCurrentUrl(current_url): HxCurrentUrl,
 ) -> impl IntoResponse {
     let poll = sqlx::query!(
         r#"
@@ -587,9 +587,10 @@ async fn share_admin(
                 .map(|t| t.value() == poll.admin_token)
                 .unwrap_or(false);
 
+            let scheme = current_url.map(|u| u.scheme_str().map(|s| s.to_owned())).flatten().unwrap_or("https".to_owned());
             let context = context! {
                 is_admin => &is_admin,
-                admin_url => &format!("/poll/{}/admin/{}", token, poll.admin_token),
+                admin_url => &format!("{}://{}/poll/{}/admin/{}", scheme, host, token, poll.admin_token),
             };
 
             let html = state.render("share_poll.html", context).unwrap();

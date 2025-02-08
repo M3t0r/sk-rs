@@ -20,12 +20,23 @@
     </p>
     {% endif %}
     {% if is_admin %}
-    <nav>
-        <ul>
-            <li><a href="{{edit_url}}" class="primary" role="button"><i class="fa-solid fa-pencil"></i>&nbsp;edit</a>
-            <li><a hx-target="closest li" hx-get="{{admin_share_url}}" class="secondary" role="button"><i class="fa-solid fa-lock"></i>&nbsp;share admin access</a>
-        </ul>
-    </nav>
+    <div class="grid">
+        <a
+            href="{{edit_url}}"
+            class="primary"
+            role="button"
+        >
+            <i class="fa-solid fa-pencil"></i>&nbsp;edit
+        </a>
+        <a
+            hx-swap="outerHTML"
+            hx-get="{{admin_share_url}}"
+            class="secondary"
+            role="button"
+        >
+            <i class="fa-solid fa-lock"></i>&nbsp;share admin access
+        </a>
+    </div>
     {% endif %}
     
     <div class="overflow-auto">

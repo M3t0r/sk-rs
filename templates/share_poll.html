@@ -1,5 +1,24 @@
 {% if is_admin %}
-<a href="{{admin_url}}" hx-boost="false"><i class="fa-solid fa-unlock"></i>&nbsp;admin link</a>
+<div role="group" style="margin-bottom: 0;">
+    <input
+        id="admin-link"
+        type="text"
+        readonly
+        value="{{admin_url}}"
+        hx-on:click="this.select()"
+    >
+    <button
+        title="copy to clipboard"
+        hx-on:click="navigator.clipboard.writeText(htmx.find('#admin-link').value).then(() => {i = htmx.find(this, 'i'); htmx.removeClass(i, 'fa-copy'); htmx.addClass(i, 'fa-check');})"
+    >
+        <i class="fa-solid fa-copy"></i>
+    </button>
+</div>
+<script>
+    // the user just pressed the share button which this replaced, so focusing
+    // this element is not unexpected behaviour
+    htmx.find("#admin-link").select();
+</script>
 {% else %}
 <del data-tooltip="you don't have admin access"><i class="fa-solid fa-lock"></i>&nbsp;share admin access</del>
 {% endif %}
