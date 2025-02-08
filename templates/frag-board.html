@@ -11,6 +11,9 @@
     <tbody>
         {%- for row in board.by_options %}
         {%- set option_index = loop.index0 %}
+        {%- if is_expired %}
+            {%- set option_index = board.options_sorted_by_score_desc[loop.index0] %}
+        {%- endif %}
         {%- set option = board.option_names[option_index] %}
         {%- set option_is_link = board.option_is_link[option_index] %}
         <tr>

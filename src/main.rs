@@ -330,6 +330,7 @@ struct RenderableBoard<'a> {
     voter_names: Vec<&'a str>,
     option_names: Vec<&'a str>,
     option_is_link: Vec<bool>,
+    options_sorted_by_score_desc: Vec<usize>,
     by_options: Vec<Vec<Vote>>,
     by_voters: Vec<Vec<Vote>>,
     can_edit_by_voters: Vec<bool>,
@@ -397,10 +398,15 @@ impl<'a> RenderableBoard<'a> {
             .map(|o| o.starts_with("https://") && o.len() > "https://".len())
             .collect();
 
+        let mut options_and_scores: Vec<_> = score_by_options.iter().enumerate().collect();
+        options_and_scores.sort_by(|(_, a), (_, b)| b.total_cmp(a));
+        let options_sorted_by_score_desc: Vec<_> = options_and_scores.iter().map(|(o, _)| *o).collect();
+
         Ok(RenderableBoard {
             voter_names,
             option_names,
             option_is_link,
+            options_sorted_by_score_desc,
             by_options,
             by_voters,
             can_edit_by_voters,
