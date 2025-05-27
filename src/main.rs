@@ -1,23 +1,23 @@
 use axum::{
-    extract::{Path, State},
-    http::{header, StatusCode},
-    response::{IntoResponse, Redirect, Response, Html},
-    routing::{get, post},
     Router,
+    extract::{Path, State},
+    http::{StatusCode, header},
+    response::{Html, IntoResponse, Redirect, Response},
+    routing::{get, post},
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar, Form, Host};
+use axum_extra::extract::{CookieJar, Form, Host, cookie::Cookie};
 use axum_htmx::{AutoVaryLayer, HxCurrentUrl, HxRefresh};
 use clap::Parser;
-use minijinja::{context, Environment, Value};
+use minijinja::{Environment, Value, context};
 use serde::{Deserialize, Serialize};
 use sqlx::{
+    QueryBuilder,
     migrate::MigrateError,
     sqlite::{SqliteConnectOptions, SqlitePool},
     types::Json,
-    QueryBuilder,
 };
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf, str::FromStr};
-use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
+use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
 use tower_http::services::ServeDir;
 
 mod token;
@@ -394,13 +394,15 @@ impl<'a> RenderableBoard<'a> {
         }
         let score_class_by_options = score_by_options.iter().map(score_class).collect();
 
-        let option_is_link: Vec<_> = option_names.iter()
+        let option_is_link: Vec<_> = option_names
+            .iter()
             .map(|o| o.starts_with("https://") && o.len() > "https://".len())
             .collect();
 
         let mut options_and_scores: Vec<_> = score_by_options.iter().enumerate().collect();
         options_and_scores.sort_by(|(_, a), (_, b)| b.total_cmp(a));
-        let options_sorted_by_score_desc: Vec<_> = options_and_scores.iter().map(|(o, _)| *o).collect();
+        let options_sorted_by_score_desc: Vec<_> =
+            options_and_scores.iter().map(|(o, _)| *o).collect();
 
         Ok(RenderableBoard {
             voter_names,
@@ -593,7 +595,10 @@ async fn share_admin(
                 .map(|t| t.value() == poll.admin_token)
                 .unwrap_or(false);
 
-            let scheme = current_url.map(|u| u.scheme_str().map(|s| s.to_owned())).flatten().unwrap_or("https".to_owned());
+            let scheme = current_url
+                .map(|u| u.scheme_str().map(|s| s.to_owned()))
+                .flatten()
+                .unwrap_or("https".to_owned());
             let context = context! {
                 is_admin => &is_admin,
                 admin_url => &format!("{}://{}/poll/{}/admin/{}", scheme, host, token, poll.admin_token),

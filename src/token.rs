@@ -1,5 +1,5 @@
 use rand::seq::IndexedRandom;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 use sqlx::{Decode, Encode, Type};
 use std::fmt;
 use std::ops::Deref;
