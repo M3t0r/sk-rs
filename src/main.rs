@@ -96,6 +96,14 @@ fn render_markdown(value: String) -> minijinja::Value {
     minijinja::Value::from_safe_string(html_buf)
 }
 
+fn build_info() -> minijinja::Value {
+    minijinja::Value::from_safe_string(format!(
+        "{} v{}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    ))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
@@ -115,6 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut tpl = Environment::new();
     tpl.add_filter("slugify", slugify);
     tpl.add_filter("markdown", render_markdown);
+    tpl.add_function("build_info", build_info);
     minijinja_contrib::add_to_environment(&mut tpl);
     minijinja_embed::load_templates!(&mut tpl);
 
