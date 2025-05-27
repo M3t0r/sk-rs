@@ -7,7 +7,7 @@ IMAGE_TAG := ${GIT_VERSION}
 
 BUILD := podman build
 BUILDFLAGS := --platform linux/amd64,linux/arm64
-PUSH := podman push
+PUSH := podman manifest push
 PUSHFLAGS :=
 
 export DATABASE_URL ?= sqlite://database.sqlite
@@ -40,7 +40,7 @@ image-build:
 		--label org.opencontainers.image.created="$$(date --rfc-3339=seconds)" \
 		--label org.opencontainers.image.version=${GIT_VERSION} \
 		--label org.opencontainers.image.revision="$$(git rev-parse HEAD)" \
-		-t ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+		--manifest ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
 		.
 
 .PHONY: image-push
