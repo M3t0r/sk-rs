@@ -6,7 +6,7 @@ IMAGE_NAME := sk-rs
 IMAGE_TAG := ${GIT_VERSION}
 
 BUILD := podman build
-BUILDFLAGS :=
+BUILDFLAGS := --platform linux/amd64,linux/arm64
 PUSH := podman push
 PUSHFLAGS :=
 
