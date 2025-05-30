@@ -15,7 +15,7 @@ COPY . .
 RUN cargo build --release
 
 # Runtime stage
-FROM alpine:3.21
+FROM alpine:3.22
 
 RUN apk add --no-cache libgcc sqlite
 RUN adduser -u 100 -S app -G users
