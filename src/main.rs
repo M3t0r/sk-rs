@@ -142,6 +142,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/poll/{token}/new_voter", post(new_voter))
         .route("/poll/{token}/vote", post(vote))
         .route("/poll/{token}/admin/edit", get(edit_poll))
+        .route("/poll/{token}/admin/end", post(end_poll))
+        .route("/poll/{token}/admin/reopen", post(reopen_poll))
         .route("/poll/{token}/admin/share", get(share_admin))
         .route("/poll/{token}/admin/{admin_token}", get(login_admin))
         .nest_service("/static", ServeDir::new(PathBuf::from("static")))
@@ -557,6 +559,8 @@ async fn view_poll(
                 context = context! {
                     admin_share_url => &format!("/poll/{}/admin/share", token),
                     edit_url => &format!("/poll/{}/admin/edit", token),
+                    end_url => &format!("/poll/{}/admin/end", token),
+                    reopen_url => &format!("/poll/{}/admin/reopen", token),
                     ..context
                 };
             }
@@ -634,6 +638,134 @@ async fn edit_poll(
     cookies: CookieJar,
 ) -> impl IntoResponse {
     view_poll(State(state), Path(token), cookies).await
+}
+
+async fn end_poll(
+    State(state): State<AppState>,
+    Path(token): Path<Token>,
+    cookies: CookieJar,
+) -> impl IntoResponse {
+    let poll = sqlx::query!(
+        r#"
+        SELECT
+            admin_token
+        FROM polls
+        WHERE token = ?
+        "#,
+        token
+    )
+    .fetch_optional(&state.db)
+    .await;
+
+    let now = OffsetDateTime::now_utc();
+
+    match poll {
+        Ok(Some(poll)) => {
+            let is_admin = cookies
+                .get(&format!("admin_{}", token))
+                .map(|t| t.value() == poll.admin_token)
+                .unwrap_or(false);
+
+            if is_admin {
+                if let Err(e) = sqlx::query!(
+                    r#"
+                    UPDATE polls
+                    SET expiration = ?
+                    WHERE token = ?
+                    "#,
+                    now,
+                    token,
+                )
+                .execute(&state.db)
+                .await
+                {
+                    eprintln!("Error updating poll expiration: {}: {:?}", token, e);
+                }
+            }
+
+            let poll_url = format!("/poll/{}/view", token);
+            let context = context! {
+                is_admin => &is_admin,
+                poll_url => &poll_url,
+            };
+
+            let html = state.render("end_poll.html", context).unwrap();
+            (axum_htmx::HxLocation::from_str(&poll_url), Html(html)).into_response()
+        }
+        Ok(None) => (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(),
+        Err(e) => {
+            eprintln!("Error fetching poll: {}: {:?}", token, e);
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response()
+        }
+    }
+}
+
+async fn reopen_poll(
+    State(state): State<AppState>,
+    Path(token): Path<Token>,
+    cookies: CookieJar,
+) -> impl IntoResponse {
+    let poll = sqlx::query!(
+        r#"
+        SELECT
+            admin_token
+        FROM polls
+        WHERE token = ?
+        "#,
+        token
+    )
+    .fetch_optional(&state.db)
+    .await;
+
+    let new_expiration = OffsetDateTime::now_utc() + Duration::days(90);
+
+    match poll {
+        Ok(Some(poll)) => {
+            let is_admin = cookies
+                .get(&format!("admin_{}", token))
+                .map(|t| t.value() == poll.admin_token)
+                .unwrap_or(false);
+
+            if is_admin {
+                if let Err(e) = sqlx::query!(
+                    r#"
+                    UPDATE polls
+                    SET expiration = ?
+                    WHERE token = ?
+                    "#,
+                    new_expiration,
+                    token,
+                )
+                .execute(&state.db)
+                .await
+                {
+                    eprintln!("Error updating poll expiration: {}: {:?}", token, e);
+                }
+            }
+
+            let poll_url = format!("/poll/{}/view", token);
+            let context = context! {
+                is_admin => &is_admin,
+                poll_url => &poll_url,
+            };
+
+            let html = state.render("end_poll.html", context).unwrap();
+            (axum_htmx::HxLocation::from_str(&poll_url), Html(html)).into_response()
+        }
+        Ok(None) => (axum::http::StatusCode::NOT_FOUND, "Poll not found").into_response(),
+        Err(e) => {
+            eprintln!("Error fetching poll: {}: {:?}", token, e);
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response()
+        }
+    }
 }
 
 async fn login_admin(

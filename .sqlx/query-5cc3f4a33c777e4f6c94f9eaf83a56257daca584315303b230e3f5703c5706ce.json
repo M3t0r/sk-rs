@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            admin_token\n        FROM polls\n        WHERE token = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "admin_token",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5cc3f4a33c777e4f6c94f9eaf83a56257daca584315303b230e3f5703c5706ce"
+}

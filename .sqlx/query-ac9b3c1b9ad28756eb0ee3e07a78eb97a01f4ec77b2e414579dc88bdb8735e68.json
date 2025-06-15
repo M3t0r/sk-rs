@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    UPDATE polls\n                    SET expiration = ?\n                    WHERE token = ?\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ac9b3c1b9ad28756eb0ee3e07a78eb97a01f4ec77b2e414579dc88bdb8735e68"
+}

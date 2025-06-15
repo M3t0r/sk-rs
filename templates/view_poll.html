@@ -23,22 +23,39 @@
     <div class="grid">
         <a
             href="{{edit_url}}"
-            class="primary"
+            class="outline primary"
             role="button"
         >
             <i class="fa-solid fa-pencil"></i>&nbsp;edit
         </a>
+        {% if is_expired %}
+        <a
+            hx-post="{{reopen_url}}"
+            class="outline"
+            role="button"
+        >
+            <i class="fa-solid fa-circle-xmark"></i>&nbsp;re-open
+        </a>
+        {% else %}
+        <a
+            hx-post="{{end_url}}"
+            class="outline"
+            role="button"
+        >
+            <i class="fa-solid fa-circle-xmark"></i>&nbsp;end
+        </a>
+        {% endif %}
         <a
             hx-swap="outerHTML"
             hx-get="{{admin_share_url}}"
-            class="secondary"
+            class="outline secondary"
             role="button"
         >
             <i class="fa-solid fa-lock"></i>&nbsp;share admin access
         </a>
     </div>
     {% endif %}
-    
+
     <div class="overflow-auto">
     {% include "frag-board.html" %}
     </div>
@@ -46,7 +63,7 @@
     {% if new_voter_url is defined %}
     {% include "frag-new-voter-form.html" %}
     {% endif %}
-    
+
     <a href="/" role="button"><i class="fa-solid fa-chevron-left"></i>&nbsp;Back to Home</a>
 </main>
 {% endblock %}
