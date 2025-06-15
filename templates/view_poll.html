@@ -2,25 +2,25 @@
 {% block markup %}
 <main class="container">
     <h1>{{ title }}</h1>
-    <p>{{ description|markdown }}</p>
-    {% if is_expired %}
-    <p>
+    <section>
+        {{ description|markdown }}
+    </section>
+    <section>
+        {% if is_expired %}
         Expiration Date:
         <del data-tooltip="{{ expiration|datetimeformat(format="iso", tz="UTC") }}">
             {{ expiration|dateformat }}
         </del>
         <small><i class="fas fa-exclamation-circle"></i>&nbsp;This poll has expired and is no longer active.</small>
-    </p>
-    {% else %}
-    <p>
+        {% else %}
         Expiration Date:
         <span data-tooltip="{{ expiration|datetimeformat(format="iso", tz="UTC") }}">
             {{ expiration|dateformat }}
         </span>
-    </p>
-    {% endif %}
+        {% endif %}
+    </section>
     {% if is_admin %}
-    <div class="grid">
+    <section class="grid">
         <a
             href="{{edit_url}}"
             class="outline primary"
@@ -53,7 +53,7 @@
         >
             <i class="fa-solid fa-lock"></i>&nbsp;share admin access
         </a>
-    </div>
+    </section>
     {% endif %}
 
     <div class="overflow-auto">
