@@ -848,7 +848,7 @@ async fn new_voter(
         Ok(None) => {
             let html = state
                 .render(
-                    "frag-new-voter-form.html",
+                    "frag_new_voter_form.html",
                     context! {
                         error => "poll not found",
                         error_fixable => &false,
@@ -871,7 +871,7 @@ async fn new_voter(
     if is_expired {
         let html = state
             .render(
-                "frag-new-voter-form.html",
+                "frag_new_voter_form.html",
                 context! {
                     error => "the poll has expired",
                     error_fixable => &false,
@@ -886,7 +886,7 @@ async fn new_voter(
     if name.is_empty() {
         let html = state
             .render(
-                "frag-new-voter-form.html",
+                "frag_new_voter_form.html",
                 context! {
                     error => "you have to provide a name",
                     error_fixable => &true,
@@ -900,7 +900,7 @@ async fn new_voter(
     if poll.voters.contains(&name) {
         let html = state
             .render(
-                "frag-new-voter-form.html",
+                "frag_new_voter_form.html",
                 context! {
                     error => "name already in use",
                     error_fixable => &true,
@@ -1094,7 +1094,7 @@ async fn vote(
         board.disable_votes();
     }
 
-    Ok(Html(state.render("frag-board.html", context! { board })?).into_response())
+    Ok(Html(state.render("frag_board.html", context! { board })?).into_response())
 }
 
 fn make_admin_cookie(poll: &Token, admin: &Token, expiration: OffsetDateTime) -> Cookie<'static> {
