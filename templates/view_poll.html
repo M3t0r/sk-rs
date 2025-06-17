@@ -56,14 +56,21 @@
     </section>
     {% endif %}
 
-    <div class="overflow-auto">
+    <section class="overflow-auto">
     {% include "frag_board.html" %}
-    </div>
+    <small>
+        <i class="fa-solid fa-circle-info"></i>&nbsp;Votes are automatically saved in the background
+    </small>
+    </section>
 
     {% if new_voter_url is defined %}
-    {% include "frag_new_voter_form.html" %}
+    <section>
+        <button
+            hx-get="{{new_voter_url}}"
+            hx-swap="outerHTML"
+            hx-target="closest section"
+        >Join the poll</button>
+    </section>
     {% endif %}
-
-    <a href="/" role="button"><i class="fa-solid fa-chevron-left"></i>&nbsp;Back to Home</a>
 </main>
 {% endblock %}

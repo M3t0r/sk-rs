@@ -139,6 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/poll/new/new-option", get(new_poll_new_option))
         .route("/poll/new/del-option", get(new_poll_del_option))
         .route("/poll/{token}/view", get(view_poll))
+        .route("/poll/{token}/new_voter", get(new_voter_form))
         .route("/poll/{token}/new_voter", post(new_voter))
         .route("/poll/{token}/vote", post(vote))
         .route("/poll/{token}/admin/edit", get(edit_poll))
@@ -816,6 +817,70 @@ async fn login_admin(
 #[derive(Deserialize)]
 struct NewVoterForm {
     name: String,
+}
+
+async fn new_voter_form(
+    State(state): State<AppState>,
+    Path(token): Path<Token>,
+) -> impl IntoResponse {
+    let defaults = context! {new_voter_url => &format!("/poll/{}/new_voter", token)};
+
+    let poll = match sqlx::query!(
+        r#"
+            SELECT
+                polls.expiration AS "expiration!: time::OffsetDateTime"
+            FROM
+                polls
+            WHERE
+                token = ?
+        "#,
+        token,
+    )
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            let html = state
+                .render(
+                    "frag_new_voter_form.html",
+                    context! {
+                        error => "poll not found",
+                        error_fixable => &false,
+                        ..defaults,
+                    },
+                )
+                .unwrap();
+            return (axum::http::StatusCode::NOT_FOUND, Html(html)).into_response();
+        }
+        Err(e) => {
+            eprintln!("Error fetching poll: {}: {:?}", token, e);
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "Error fetching poll",
+            )
+                .into_response();
+        }
+    };
+    let is_expired = OffsetDateTime::now_utc() > poll.expiration;
+    if is_expired {
+        let html = state
+            .render(
+                "frag_new_voter_form.html",
+                context! {
+                    error => "the poll has expired",
+                    error_fixable => &false,
+                    ..defaults,
+                },
+            )
+            .unwrap();
+        return (axum::http::StatusCode::GONE, Html(html)).into_response();
+    }
+
+    let html = state
+        .render("frag_new_voter_form.html", context! { ..defaults })
+        .unwrap();
+    Html(html).into_response()
 }
 
 async fn new_voter(

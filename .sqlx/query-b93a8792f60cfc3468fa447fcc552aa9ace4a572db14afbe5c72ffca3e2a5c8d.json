@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                polls.expiration AS \"expiration!: time::OffsetDateTime\"\n            FROM\n                polls\n            WHERE\n                token = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "expiration!: time::OffsetDateTime",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b93a8792f60cfc3468fa447fcc552aa9ace4a572db14afbe5c72ffca3e2a5c8d"
+}

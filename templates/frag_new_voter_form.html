@@ -14,4 +14,8 @@
     {%- if error %}
     <small id="new-voter-helper">{{ error }}</small>
     {%- endif %}
+    <script>
+        // the user just interacted, so focusing the element is not unexpected behaviour
+        htmx.find('input[name="name"]').select();
+    </script>
 </form>
