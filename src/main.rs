@@ -17,6 +17,8 @@ use sqlx::{
     types::Json,
 };
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf, str::FromStr};
+use minijinja::ErrorKind::SyntaxError;
+use minijinja_contrib::filters::{dateformat, timeformat};
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
 use tower_http::services::ServeDir;
 
@@ -96,6 +98,12 @@ fn render_markdown(value: String) -> minijinja::Value {
     minijinja::Value::from_safe_string(html_buf)
 }
 
+fn as_human_readable_date(value: String) -> Result<minijinja::Value,minijinja::Error>{
+    let datetime = time::PrimitiveDateTime::parse(&value,&time::format_description::well_known::Iso8601::DEFAULT)
+        .map_err(|e| minijinja::Error::new(SyntaxError,e.to_string()))?;
+    Ok(minijinja::Value::from_safe_string(datetime.format(&time::format_description::well_known::Rfc3339).unwrap()))
+}
+
 fn build_info() -> minijinja::Value {
     minijinja::Value::from_safe_string(format!(
         "{} v{}",
@@ -119,10 +127,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = SqlitePool::connect_with(pool_options).await?;
     migrate(&pool).await?;
 
-    // Initialize Tera
+    // Initialize miniJinja
     let mut tpl = Environment::new();
     tpl.add_filter("slugify", slugify);
     tpl.add_filter("markdown", render_markdown);
+    tpl.add_filter("as_human_readable_date", as_human_readable_date);
     tpl.add_function("build_info", build_info);
     minijinja_contrib::add_to_environment(&mut tpl);
     minijinja_embed::load_templates!(&mut tpl);
@@ -342,6 +351,7 @@ struct RenderableBoard<'a> {
     voter_names: Vec<&'a str>,
     option_names: Vec<&'a str>,
     option_is_link: Vec<bool>,
+    option_is_isodate: Vec<bool>,
     options_sorted_by_score_desc: Vec<usize>,
     by_options: Vec<Vec<Vote>>,
     by_voters: Vec<Vec<Vote>>,
@@ -410,6 +420,10 @@ impl<'a> RenderableBoard<'a> {
             .iter()
             .map(|o| o.starts_with("https://") && o.len() > "https://".len())
             .collect();
+        let option_is_isodate: Vec<_> = option_names
+            .iter()
+            .map(|o| time::PrimitiveDateTime::parse(o,&time::format_description::well_known::Iso8601::DEFAULT).is_ok())
+            .collect();
 
         let mut options_and_scores: Vec<_> = score_by_options.iter().enumerate().collect();
         options_and_scores.sort_by(|(_, a), (_, b)| b.total_cmp(a));
@@ -420,6 +434,7 @@ impl<'a> RenderableBoard<'a> {
             voter_names,
             option_names,
             option_is_link,
+            option_is_isodate,
             options_sorted_by_score_desc,
             by_options,
             by_voters,

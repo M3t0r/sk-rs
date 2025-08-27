@@ -20,7 +20,9 @@
             <th>
                 {%- if option_is_link %}
                 <a target="_blank" href="{{ option }}">{{ option }}</a>
-                {% else -%}
+                {% elif option_is_isodate %}
+                {{ option|as_human_readable_date }}
+                {% else %}
                 {{ option }}
                 {% endif -%}
             </th>
