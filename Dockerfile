@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.94.0-alpine as chef
+FROM rust:1.98.1-alpine as chef
 WORKDIR /app
 RUN apk add --no-cache alpine-sdk sqlite-libs
 RUN cargo install cargo-chef
